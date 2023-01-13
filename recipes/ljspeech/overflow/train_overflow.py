@@ -14,7 +14,10 @@ output_path = os.path.dirname(os.path.abspath(__file__))
 
 # init configs
 dataset_config = BaseDatasetConfig(
-    formatter="ljspeech", meta_file_train="metadata.csv", path=os.path.join("data", "LJSpeech-1.1/")
+    formatter="ljspeech",
+    meta_file_train="filelists/ljs_audio_text_train_filelist.txt",
+    meta_file_val="filelists/ljs_audio_text_val_filelist.txt",
+    path=os.path.join("data", "LJSpeech-1.1/"),
 )
 
 audio_config = BaseAudioConfig(
@@ -50,6 +53,9 @@ config = OverflowConfig(  # This is the config that is saved for the future use
     print_step=1,
     print_eval=True,
     mixed_precision=True,
+    save_all_best=True,
+    save_n_checkpoints=100000,
+    shuffle=True,
     output_path=output_path,
     datasets=[dataset_config],
 )
