@@ -21,13 +21,16 @@ output_path = os.path.dirname(os.path.abspath(__file__))
 # Set LJSpeech as our target dataset and define its path.
 # You can also use a simple Dict to define the dataset and pass it to your custom formatter.
 dataset_config = BaseDatasetConfig(
-    formatter="ljspeech", meta_file_train="metadata.csv", path=os.path.join(output_path, "../LJSpeech-1.1/")
+    formatter="ljspeech",
+    meta_file_train="filelists/ljs_audio_text_train_filelist.txt",
+    meta_file_val="filelists/ljs_audio_text_val_filelist.txt",
+    path=os.path.join("data", "LJSpeech-1.1/"),
 )
 
 # INITIALIZE THE TRAINING CONFIGURATION
 # Configure the model. Every config class inherits the BaseTTSConfig.
 config = GlowTTSConfig(
-    batch_size=32,
+    batch_size=28,
     eval_batch_size=16,
     num_loader_workers=4,
     num_eval_loader_workers=4,
@@ -41,8 +44,11 @@ config = GlowTTSConfig(
     print_step=25,
     print_eval=False,
     mixed_precision=True,
+    save_all_best=True,
+    save_n_checkpoints=100000,
     output_path=output_path,
     datasets=[dataset_config],
+    add_blank=True,
 )
 
 # INITIALIZE THE AUDIO PROCESSOR

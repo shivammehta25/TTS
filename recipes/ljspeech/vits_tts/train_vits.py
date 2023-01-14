@@ -10,9 +10,14 @@ from TTS.tts.utils.text.tokenizer import TTSTokenizer
 from TTS.utils.audio import AudioProcessor
 
 output_path = os.path.dirname(os.path.abspath(__file__))
+# init configs
 dataset_config = BaseDatasetConfig(
-    formatter="ljspeech", meta_file_train="metadata.csv", path=os.path.join(output_path, "../LJSpeech-1.1/")
+    formatter="ljspeech",
+    meta_file_train="filelists/ljs_audio_text_train_filelist.txt",
+    meta_file_val="filelists/ljs_audio_text_val_filelist.txt",
+    path=os.path.join("data", "LJSpeech-1.1/"),
 )
+
 audio_config = VitsAudioConfig(
     sample_rate=22050, win_length=1024, hop_length=256, num_mels=80, mel_fmin=0, mel_fmax=None
 )
@@ -20,7 +25,7 @@ audio_config = VitsAudioConfig(
 config = VitsConfig(
     audio=audio_config,
     run_name="vits_ljspeech",
-    batch_size=32,
+    batch_size=28,
     eval_batch_size=16,
     batch_group_size=5,
     num_loader_workers=8,
@@ -33,12 +38,15 @@ config = VitsConfig(
     phoneme_language="en-us",
     phoneme_cache_path=os.path.join(output_path, "phoneme_cache"),
     compute_input_seq_cache=True,
-    print_step=25,
+    print_step=10,
     print_eval=True,
     mixed_precision=True,
+    save_all_best=True,
+    save_n_checkpoints=100000,
     output_path=output_path,
     datasets=[dataset_config],
     cudnn_benchmark=False,
+    add_blank=True,
 )
 
 # INITIALIZE THE AUDIO PROCESSOR

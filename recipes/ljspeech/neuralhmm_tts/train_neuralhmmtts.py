@@ -14,9 +14,11 @@ output_path = os.path.dirname(os.path.abspath(__file__))
 
 # init configs
 dataset_config = BaseDatasetConfig(
-    formatter="ljspeech", meta_file_train="metadata.csv", path=os.path.join("data", "LJSpeech-1.1/")
+    formatter="ljspeech",
+    meta_file_train="filelists/ljs_audio_text_train_filelist.txt",
+    meta_file_val="filelists/ljs_audio_text_val_filelist.txt",
+    path=os.path.join("data", "LJSpeech-1.1/"),
 )
-
 audio_config = BaseAudioConfig(
     sample_rate=22050,
     do_trim_silence=True,
@@ -33,7 +35,7 @@ audio_config = BaseAudioConfig(
 config = NeuralhmmTTSConfig(  # This is the config that is saved for the future use
     run_name="neuralhmmtts_ljspeech",
     audio=audio_config,
-    batch_size=32,
+    batch_size=28,
     eval_batch_size=16,
     num_loader_workers=4,
     num_eval_loader_workers=4,

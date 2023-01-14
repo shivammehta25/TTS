@@ -307,10 +307,10 @@ class BaseTTSConfig(BaseTrainingConfig):
     batch_group_size: int = 0
     loss_masking: bool = None
     # dataloading
-    min_audio_len: int = 1
+    min_audio_len: int = 512
     max_audio_len: int = float("inf")
-    min_text_len: int = 1
-    max_text_len: int = float("inf")
+    min_text_len: int = 10
+    max_text_len: int = 500
     compute_f0: bool = False
     compute_linear_spec: bool = False
     precompute_num_workers: int = 0
