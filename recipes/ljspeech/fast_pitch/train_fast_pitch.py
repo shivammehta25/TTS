@@ -60,7 +60,7 @@ config = FastPitchConfig(
     phoneme_language="en-us",
     phoneme_cache_path=os.path.join(output_path, "phoneme_cache"),
     precompute_num_workers=4,
-    print_step=50,
+    print_step=10,
     print_eval=True,
     mixed_precision=True,
     save_n_checkpoints=100000,
@@ -74,7 +74,7 @@ if not config.model_args.use_aligner:
     model_path, config_path, _ = manager.download_model("tts_models/en/ljspeech/tacotron2-DCA")
     # TODO: make compute_attention python callable
     os.system(
-        f"python TTS/bin/compute_attention_masks.py --model_path {model_path} --config_path {config_path} --dataset ljspeech --dataset_metafile metadata.csv --data_path ./recipes/ljspeech/LJSpeech-1.1/  --use_cuda true"
+        f"python TTS/bin/compute_attention_masks.py --model_path {model_path} --config_path {config_path} --dataset ljspeech --dataset_metafile metadata.csv --data_path data/LJSpeech-1.1/  --use_cuda true"
     )
 
 # INITIALIZE THE AUDIO PROCESSOR
