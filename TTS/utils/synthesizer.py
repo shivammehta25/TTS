@@ -180,6 +180,7 @@ class Synthesizer(object):
         style_text=None,
         reference_wav=None,
         reference_speaker_name=None,
+        split=False,
     ) -> List[int]:
         """🐸 TTS magic. Run all the models and generate speech.
 
@@ -204,9 +205,12 @@ class Synthesizer(object):
             )
 
         if text:
-            sens = self.split_into_sentences(text)
-            print(" > Text splitted to sentences.")
-            print(sens)
+            if split:
+                sens = self.split_into_sentences(text)
+                print(" > Text splitted to sentences.")
+                print(sens)
+            else:
+                sens = [text]
 
         # handle multi-speaker
         speaker_embedding = None

@@ -19,6 +19,7 @@ dataset_config = BaseDatasetConfig(
     formatter="ljspeech",
     meta_file_train="filelists/ljs_audio_text_train_filelist.txt",
     meta_file_val="filelists/ljs_audio_text_val_filelist.txt",
+    meta_file_attn_mask=os.path.join("data", "LJSpeech-1.1", "metadata_attn_mask.txt"),
     path=os.path.join("data", "LJSpeech-1.1/"),
 )
 

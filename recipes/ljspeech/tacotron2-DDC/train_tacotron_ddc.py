@@ -37,7 +37,7 @@ audio_config = BaseAudioConfig(
 
 config = Tacotron2Config(  # This is the config that is saved for the future use
     audio=audio_config,
-    batch_size=28,
+    batch_size=30,
     eval_batch_size=16,
     num_loader_workers=4,
     num_eval_loader_workers=4,
@@ -54,7 +54,7 @@ config = Tacotron2Config(  # This is the config that is saved for the future use
     precompute_num_workers=8,
     print_step=10,
     print_eval=True,
-    mixed_precision=False,
+    mixed_precision=True,
     save_all_best=True,
     save_n_checkpoints=100000,
     output_path=output_path,

@@ -17,6 +17,7 @@ dataset_config = BaseDatasetConfig(
     formatter="ljspeech",
     meta_file_train="filelists/ljs_audio_text_train_filelist.txt",
     meta_file_val="filelists/ljs_audio_text_val_filelist.txt",
+    meta_file_attn_mask=os.path.join("data", "LJSpeech-1.1", "metadata_attn_mask.txt"),
     path=os.path.join("data", "LJSpeech-1.1/"),
 )
 
@@ -66,13 +67,18 @@ config = FastSpeechConfig(
     save_n_checkpoints=100000,
 )
 
+print(config.datasets[0].meta_file_attn_mask)
+print("Aligner", config.model_args.use_aligner)
+
+
 # compute alignments
-if not config.model_args.use_aligner:
+if not config.model_args.use_aligner: 
+    print("Generating alignments...")
     manager = ModelManager()
     model_path, config_path, _ = manager.download_model("tts_models/en/ljspeech/tacotron2-DCA")
     # TODO: make compute_attention python callable
     os.system(
-        f"python TTS/bin/compute_attention_masks.py --model_path {model_path} --config_path {config_path} --dataset ljspeech --dataset_metafile metadata.csv --data_path ./recipes/ljspeech/LJSpeech-1.1/  --use_cuda true"
+        f"python TTS/bin/compute_attention_masks.py --model_path {model_path} --config_path {config_path} --dataset ljspeech --dataset_metafile metadata.csv --data_path data/LJSpeech-1.1/  --use_cuda true"
     )
 
 # INITIALIZE THE AUDIO PROCESSOR

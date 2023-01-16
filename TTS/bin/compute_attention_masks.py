@@ -8,10 +8,11 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from TTS.config import load_config
-from TTS.tts.datasets.TTSDataset import TTSDataset
+from TTS.config import BaseAudioConfig, BaseDatasetConfig, load_config
+from TTS.tts.datasets import load_tts_samples
+from TTS.tts.datasets.dataset import TTSDataset
 from TTS.tts.models import setup_model
-from TTS.tts.utils.text.characters import make_symbols, phonemes, symbols
+from TTS.tts.utils.text.tokenizer import TTSTokenizer
 from TTS.utils.audio import AudioProcessor
 from TTS.utils.io import load_checkpoint
 
@@ -69,8 +70,11 @@ Example run:
     ap = AudioProcessor(**C.audio)
 
     # if the vocabulary was passed, replace the default
+    print(C.keys())
+    # import pdb; pdb.set_trace()
     if "characters" in C.keys():
-        symbols, phonemes = make_symbols(**C.characters)
+        # symbols, phonemes = make_symbols(**C.characters)
+        symbols, phonemes = C.characters.characters, C.characters.phonemes
 
     # load the model
     num_chars = len(phonemes) if C.use_phonemes else len(symbols)
@@ -78,46 +82,54 @@ Example run:
     model = setup_model(C)
     model, _ = load_checkpoint(model, args.model_path, args.use_cuda, True)
 
-    # data loader
-    preprocessor = importlib.import_module("TTS.tts.datasets.formatters")
-    preprocessor = getattr(preprocessor, args.dataset)
-    meta_data = preprocessor(args.data_path, args.dataset_metafile)
-    dataset = TTSDataset(
-        model.decoder.r,
-        C.text_cleaner,
-        compute_linear_spec=False,
-        ap=ap,
-        meta_data=meta_data,
-        characters=C.characters if "characters" in C.keys() else None,
-        add_blank=C["add_blank"] if "add_blank" in C.keys() else False,
-        use_phonemes=C.use_phonemes,
-        phoneme_cache_path=C.phoneme_cache_path,
-        phoneme_language=C.phoneme_language,
-        enable_eos_bos=C.enable_eos_bos_chars,
+    # # data loader
+    # preprocessor = importlib.import_module("TTS.tts.datasets.formatters")
+    # preprocessor = getattr(preprocessor, args.dataset)
+    # meta_data = preprocessor(args.data_path, args.dataset_metafile)
+    C.phoneme_cache_path = "TTS/bin/phoneme_cache"
+    
+    tokenizer, config = TTSTokenizer.init_from_config(C)
+    
+    dataset_config = BaseDatasetConfig(
+        formatter="ljspeech", meta_file_train="metadata.csv", path=os.path.join('data', "LJSpeech-1.1")
     )
-
-    dataset.sort_and_filter_items(C.get("sort_by_audio_len", default=False))
-    loader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        num_workers=4,
-        collate_fn=dataset.collate_fn,
-        shuffle=False,
-        drop_last=False,
+   
+    
+    train_samples, eval_samples = load_tts_samples(
+        dataset_config,
+        eval_split=False,
+        eval_split_max_size=config.eval_split_max_size,
+        eval_split_size=config.eval_split_size,
     )
+    model.tokenizer = tokenizer
+    loader = model.get_data_loader(config, {}, True, train_samples, True, 1)
 
+    # import pdb; pdb.set_trace()
+    # dataset = TTSDataset(
+    #     model.decoder.r,
+    #     C.text_cleaner,
+    #     compute_linear_spec=False,
+    #     ap=ap,
+    #     meta_data=meta_data,
+    #     characters=C.characters if "characters" in C.keys() else None,
+    #     add_blank=C["add_blank"] if "add_blank" in C.keys() else False,
+    #     use_phonemes=C.use_phonemes,
+    #     phoneme_cache_path=C.phoneme_cache_path,
+    #     phoneme_language=C.phoneme_language,
+    #     enable_eos_bos=C.enable_eos_bos_chars,
+    # )
     # compute attentions
     file_paths = []
     with torch.no_grad():
         for data in tqdm(loader):
             # setup input data
-            text_input = data[0]
-            text_lengths = data[1]
-            linear_input = data[3]
-            mel_input = data[4]
-            mel_lengths = data[5]
-            stop_targets = data[6]
-            item_idxs = data[7]
+            text_input = data['token_id']
+            text_lengths = data['token_id_lengths']
+            linear_input = data['linear']
+            mel_input = data['mel']
+            mel_lengths = data['mel_lengths']
+            stop_targets = data['stop_targets']
+            item_idxs = data['item_idxs']
 
             # dispatch data to GPU
             if args.use_cuda:
