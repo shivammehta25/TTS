@@ -72,7 +72,7 @@ print("Aligner", config.model_args.use_aligner)
 
 
 # compute alignments
-if not config.model_args.use_aligner: 
+if not config.model_args.use_aligner:
     print("Generating alignments...")
     manager = ModelManager()
     model_path, config_path, _ = manager.download_model("tts_models/en/ljspeech/tacotron2-DCA")

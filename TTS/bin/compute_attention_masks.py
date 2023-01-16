@@ -87,14 +87,13 @@ Example run:
     # preprocessor = getattr(preprocessor, args.dataset)
     # meta_data = preprocessor(args.data_path, args.dataset_metafile)
     C.phoneme_cache_path = "TTS/bin/phoneme_cache"
-    
+
     tokenizer, config = TTSTokenizer.init_from_config(C)
-    
+
     dataset_config = BaseDatasetConfig(
-        formatter="ljspeech", meta_file_train="metadata.csv", path=os.path.join('data', "LJSpeech-1.1")
+        formatter="ljspeech", meta_file_train="metadata.csv", path=os.path.join("data", "LJSpeech-1.1")
     )
-   
-    
+
     train_samples, eval_samples = load_tts_samples(
         dataset_config,
         eval_split=False,
@@ -123,13 +122,13 @@ Example run:
     with torch.no_grad():
         for data in tqdm(loader):
             # setup input data
-            text_input = data['token_id']
-            text_lengths = data['token_id_lengths']
-            linear_input = data['linear']
-            mel_input = data['mel']
-            mel_lengths = data['mel_lengths']
-            stop_targets = data['stop_targets']
-            item_idxs = data['item_idxs']
+            text_input = data["token_id"]
+            text_lengths = data["token_id_lengths"]
+            linear_input = data["linear"]
+            mel_input = data["mel"]
+            mel_lengths = data["mel_lengths"]
+            stop_targets = data["stop_targets"]
+            item_idxs = data["item_idxs"]
 
             # dispatch data to GPU
             if args.use_cuda:
