@@ -75,11 +75,11 @@ class Synthesizer(object):
             assert torch.cuda.is_available(), "CUDA is not availabe on this machine."
         self._load_tts(tts_checkpoint, tts_config_path, use_cuda)
         self.output_sample_rate = self.tts_config.audio["sample_rate"]
-        
+
         if my_vocoder is not None:
             assert self.output_sample_rate == 22050, "TTS and Vocoder sample rates must be the same."
             self.vocoder_model = my_vocoder
-            self.my_vocoder=True
+            self.my_vocoder = True
         else:
             if vocoder_checkpoint:
                 self._load_vocoder(vocoder_checkpoint, vocoder_config, use_cuda)

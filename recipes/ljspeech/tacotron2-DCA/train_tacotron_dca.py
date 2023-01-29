@@ -18,7 +18,7 @@ output_path = os.path.dirname(os.path.abspath(__file__))
 dataset_config = BaseDatasetConfig(
     formatter="ljspeech",
     meta_file_train="metadata.csv",
-#    meta_file_val="filelists/ljs_audio_text_val_filelist.txt",
+    #    meta_file_val="filelists/ljs_audio_text_val_filelist.txt",
     path=os.path.join("data", "LJSpeech-1.1/"),
 )
 

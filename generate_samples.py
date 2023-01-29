@@ -71,7 +71,7 @@ def synthesise_test(model, vocoder, text, device="cuda"):
     txt_id = model.tokenizer.text_to_ids(text)
     txt_id = torch.tensor(txt_id, device=device).unsqueeze(0)
     x_len = torch.tensor([txt_id.shape[1]], device=device)
-    output = model.inference(txt_id, aux_input={'x_lengths': x_len})
+    output = model.inference(txt_id, aux_input={"x_lengths": x_len})
     return output
 
 
@@ -81,12 +81,10 @@ if __name__ == "__main__":
 
     # vocoder_path = "/home/smehta/.local/share/tts/vocoder_models--en--ljspeech--hifigan_v2/model_file.pth"
     # vocoder_config = "/home/smehta/.local/share/tts/vocoder_models--en--ljspeech--hifigan_v2/config.json"
-    
+
     model_path = "recipes/ljspeech/glow_tts/run-January-13-2023_09+07PM-39a668ff/checkpoint_100000.pth"
     config_path = "recipes/ljspeech/glow_tts/run-January-13-2023_09+07PM-39a668ff/config.json"
 
-    
-    
     vocoder_path = "/home/smehta/.local/share/tts/vocoder_models--en--ljspeech--multiband-melgan/model_file.pth"
     vocoder_config = "/home/smehta/.local/share/tts/vocoder_models--en--ljspeech--multiband-melgan/config.json"
 

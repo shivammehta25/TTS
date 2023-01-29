@@ -13,9 +13,9 @@ from TTS.utils.synthesizer import Synthesizer
 
 
 def load_hifigan(device):
-    hifigan_loc = Path('hifigan')
-    config_file = hifigan_loc / 'config_v1.json'
-    hifi_checkpoint_file = hifigan_loc / 'g_02500000'
+    hifigan_loc = Path("hifigan")
+    config_file = hifigan_loc / "config_v1.json"
+    hifi_checkpoint_file = hifigan_loc / "g_02500000"
     with open(config_file) as f:
         data = f.read()
     json_config = json.loads(data)
@@ -23,7 +23,7 @@ def load_hifigan(device):
     torch.manual_seed(h.seed)
     generator = Generator(h).to(device)
     state_dict_g = torch.load(hifi_checkpoint_file, map_location=device)
-    generator.load_state_dict(state_dict_g['generator'])
+    generator.load_state_dict(state_dict_g["generator"])
     generator.eval()
     generator.remove_weight_norm()
     return generator
@@ -75,7 +75,6 @@ test_sentences = {
     39: "Yet the law was seldom if ever enforced.",
     40: "This was all the police wanted to know.",
 }
-
 
 
 lj_valid = [
@@ -187,27 +186,24 @@ lj_valid = list(test_sentences.values())
 # test_sentences ={ 1 : "THE DIFFERENCE IN THE RAINBOW DEPENDS CONSIDERABLY UPON THE SIZE OF THE DROPS." }
 
 
-
-
 MODELS = {
     # "glow": "tts_models/en/ljspeech/glow-tts",
     # "tacotron2": "tts_models/en/ljspeech/tacotron2-DCA",
     "overflow": "tts_models/en/ljspeech/overflow",
     # "FastPitch": "tts_models/en/ljspeech/fast_pitch",
     # "vits": "tts_models/en/ljspeech/vits",
-
 }
 
 MODELS_PATH = {
-        "overflow": {
-            "model_path": "recipes/ljspeech/overflow/berzlius/checkpoint_{}.pth",
-            "config_path": "recipes/ljspeech/overflow/berzlius/config.json",
-            "vocoder_name": "vocoder_models/en/ljspeech/hifigan_v2"
-        },
+    "overflow": {
+        "model_path": "recipes/ljspeech/overflow/berzlius/checkpoint_{}.pth",
+        "config_path": "recipes/ljspeech/overflow/berzlius/config.json",
+        "vocoder_name": "vocoder_models/en/ljspeech/hifigan_v2",
+    },
     # "glow": {
-        # "model_path": "recipes/ljspeech/glow_tts/run-January-13-2023_09+07PM-39a668ff/checkpoint_100000.pth",
-        # "config_path": "recipes/ljspeech/glow_tts/run-January-13-2023_09+07PM-39a668ff/config.json",
-        # "vocoder_name": "vocoder_models/en/ljspeech/multiband-melgan"
+    # "model_path": "recipes/ljspeech/glow_tts/run-January-13-2023_09+07PM-39a668ff/checkpoint_100000.pth",
+    # "config_path": "recipes/ljspeech/glow_tts/run-January-13-2023_09+07PM-39a668ff/config.json",
+    # "vocoder_name": "vocoder_models/en/ljspeech/multiband-melgan"
     #     "model_path": "~/.local/share/tts/tts_models--en--ljspeech--glow-tts/model_file.pth",
     #     "config_path": "~/.local/share/tts/tts_models--en--ljspeech--glow-tts/config.json",
     #     "vocoder_name": "vocoder_models/en/ljspeech/hifigan_v2"
@@ -235,9 +231,9 @@ iterations = [40000]
 
 manager = ModelManager()
 
-FOLDER = Path("synth_output_lj_valid") / 'FastPitch_extra'
+FOLDER = Path("synth_output_lj_valid") / "FastPitch_extra"
 FOLDER.mkdir(exist_ok=True, parents=True)
-generator = load_hifigan("cuda")        
+generator = load_hifigan("cuda")
 
 for model_name, model in MODELS.items():
     for iteration in iterations:
@@ -252,7 +248,6 @@ for model_name, model in MODELS.items():
         vocoder_name = model_item["default_vocoder"]
         if vocoder_name is not None:
             vocoder_path, vocoder_config_path, _ = manager.download_model(vocoder_name)
-        
 
         synthesiser = Synthesizer(
             tts_checkpoint=model_path,
@@ -262,7 +257,7 @@ for model_name, model in MODELS.items():
             my_vocoder=generator if vocoder_name is not None else None,
             use_cuda=True,
         )
-        
+
         # pbar = tqdm(test_sentences.items())
         pbar = tqdm(enumerate(lj_valid))
         for idx, text in pbar:
