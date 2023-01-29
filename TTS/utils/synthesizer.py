@@ -28,6 +28,7 @@ class Synthesizer(object):
         encoder_checkpoint: str = "",
         encoder_config: str = "",
         use_cuda: bool = False,
+        my_vocoder: torch.nn.Module = None,
     ) -> None:
         """General 🐸 TTS interface for inference. It takes a tts and a vocoder
         model and synthesize speech from the provided text.
@@ -74,9 +75,16 @@ class Synthesizer(object):
             assert torch.cuda.is_available(), "CUDA is not availabe on this machine."
         self._load_tts(tts_checkpoint, tts_config_path, use_cuda)
         self.output_sample_rate = self.tts_config.audio["sample_rate"]
-        if vocoder_checkpoint:
-            self._load_vocoder(vocoder_checkpoint, vocoder_config, use_cuda)
-            self.output_sample_rate = self.vocoder_config.audio["sample_rate"]
+        
+        if my_vocoder is not None:
+            assert self.output_sample_rate == 22050, "TTS and Vocoder sample rates must be the same."
+            self.vocoder_model = my_vocoder
+            self.my_vocoder=True
+        else:
+            if vocoder_checkpoint:
+                self._load_vocoder(vocoder_checkpoint, vocoder_config, use_cuda)
+                self.output_sample_rate = self.vocoder_config.audio["sample_rate"]
+            self.my_vocoder = False
 
     @staticmethod
     def _get_segmenter(lang: str):
@@ -298,12 +306,17 @@ class Synthesizer(object):
                     mel_postnet_spec = self.tts_model.ap.denormalize(mel_postnet_spec.T).T
                     device_type = "cuda" if self.use_cuda else "cpu"
                     # renormalize spectrogram based on vocoder config
-                    vocoder_input = self.vocoder_ap.normalize(mel_postnet_spec.T)
-                    # compute scale factor for possible sample rate mismatch
-                    scale_factor = [
-                        1,
-                        self.vocoder_config["audio"]["sample_rate"] / self.tts_model.ap.sample_rate,
-                    ]
+                    if not self.my_vocoder:
+                        vocoder_input = self.vocoder_ap.normalize(mel_postnet_spec.T)
+                        # compute scale factor for possible sample rate mismatch
+                        scale_factor = [
+                            1,
+                            self.vocoder_config["audio"]["sample_rate"] / self.tts_model.ap.sample_rate,
+                        ]
+                    else:
+                        vocoder_input = mel_postnet_spec.T
+                        scale_factor = [1, 1]
+
                     if scale_factor[1] != 1:
                         print(" > interpolating tts model output.")
                         vocoder_input = interpolate_vocoder_input(scale_factor, vocoder_input)

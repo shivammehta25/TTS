@@ -28,7 +28,7 @@ def setup_model(config: Coqpit):
             except ModuleNotFoundError as e:
                 raise ValueError(f"Model {config.model} not exist!") from e
     print(" > Vocoder Model: {}".format(config.model))
-    return MyModel.init_from_config(config)
+    return MyModel.init_from_config(config, verbose=False)
 
 
 def setup_generator(c):

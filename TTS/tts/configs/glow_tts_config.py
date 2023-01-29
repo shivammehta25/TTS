@@ -130,6 +130,7 @@ class GlowTTSConfig(BaseTTSConfig):
     num_splits: int = 4
     num_squeeze: int = 2
     sigmoid_scale: bool = False
+    log_func = "np.log"
     encoder_type: str = "rel_pos_transformer"
     encoder_params: dict = field(
         default_factory=lambda: {

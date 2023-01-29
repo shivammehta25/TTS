@@ -17,8 +17,8 @@ output_path = os.path.dirname(os.path.abspath(__file__))
 # init configs
 dataset_config = BaseDatasetConfig(
     formatter="ljspeech",
-    meta_file_train="filelists/ljs_audio_text_train_filelist.txt",
-    meta_file_val="filelists/ljs_audio_text_val_filelist.txt",
+    meta_file_train="metadata.csv",
+#    meta_file_val="filelists/ljs_audio_text_val_filelist.txt",
     path=os.path.join("data", "LJSpeech-1.1/"),
 )
 
@@ -38,7 +38,7 @@ audio_config = BaseAudioConfig(
 
 config = Tacotron2Config(  # This is the config that is saved for the future use
     audio=audio_config,
-    batch_size=28,
+    batch_size=30,
     eval_batch_size=16,
     num_loader_workers=4,
     num_eval_loader_workers=4,

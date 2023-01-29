@@ -13,8 +13,9 @@ output_path = os.path.dirname(os.path.abspath(__file__))
 # init configs
 dataset_config = BaseDatasetConfig(
     formatter="ljspeech",
-    meta_file_train="filelists/ljs_audio_text_train_filelist.txt",
-    meta_file_val="filelists/ljs_audio_text_val_filelist.txt",
+    # meta_file_train="filelists/ljs_audio_text_train_filelist.txt",
+    # meta_file_val="filelists/ljs_audio_text_val_filelist.txt",
+    meta_file_train="metadata.csv",
     path=os.path.join("data", "LJSpeech-1.1/"),
 )
 
@@ -25,7 +26,7 @@ audio_config = VitsAudioConfig(
 config = VitsConfig(
     audio=audio_config,
     run_name="vits_ljspeech",
-    batch_size=28,
+    batch_size=30,
     eval_batch_size=16,
     batch_group_size=5,
     num_loader_workers=8,

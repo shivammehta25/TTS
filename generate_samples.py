@@ -70,17 +70,23 @@ def load_vocoder(vocoder_path, vocoder_config):
 def synthesise_test(model, vocoder, text, device="cuda"):
     txt_id = model.tokenizer.text_to_ids(text)
     txt_id = torch.tensor(txt_id, device=device).unsqueeze(0)
-    output = model.inference(txt_id)
+    x_len = torch.tensor([txt_id.shape[1]], device=device)
+    output = model.inference(txt_id, aux_input={'x_lengths': x_len})
     return output
 
 
 if __name__ == "__main__":
-    model_path = "recipes/ljspeech/overflow/overflow_ljspeech-December-10-2022_09+42AM-c2df9f39/best_model_279889.pth"
-    config_path = "recipes/ljspeech/overflow/overflow_ljspeech-December-10-2022_09+42AM-c2df9f39/config.json"
+    # model_path = "recipes/ljspeech/overflow/overflow_ljspeech-December-10-2022_09+42AM-c2df9f39/best_model_279889.pth"
+    # config_path = "recipes/ljspeech/overflow/overflow_ljspeech-December-10-2022_09+42AM-c2df9f39/config.json"
 
     # vocoder_path = "/home/smehta/.local/share/tts/vocoder_models--en--ljspeech--hifigan_v2/model_file.pth"
     # vocoder_config = "/home/smehta/.local/share/tts/vocoder_models--en--ljspeech--hifigan_v2/config.json"
+    
+    model_path = "recipes/ljspeech/glow_tts/run-January-13-2023_09+07PM-39a668ff/checkpoint_100000.pth"
+    config_path = "recipes/ljspeech/glow_tts/run-January-13-2023_09+07PM-39a668ff/config.json"
 
+    
+    
     vocoder_path = "/home/smehta/.local/share/tts/vocoder_models--en--ljspeech--multiband-melgan/model_file.pth"
     vocoder_config = "/home/smehta/.local/share/tts/vocoder_models--en--ljspeech--multiband-melgan/config.json"
 
@@ -88,5 +94,5 @@ if __name__ == "__main__":
     model = load_model_components(model_path, config_path)
     vocoder = load_vocoder(vocoder_path, vocoder_config)
     output = synthesise_test(model, vocoder, text)
-    wav_form = vocoder.inference(output["model_outputs"])
-    vocoder.ap.save_wav(wav_form, "test.wav")
+    wav_form = vocoder.inference(output["model_outputs"].transpose(1, 2))[0].cpu().numpy().T
+    vocoder.ap.save_wav(wav_form, "test_glow.wav")
