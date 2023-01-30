@@ -75,13 +75,12 @@ class Overflow(BaseTTS):
             setattr(self, key, config[key])
 
         self.decoder_output_dim = config.out_channels
-
-        self.encoder = Encoder(config.num_chars, config.state_per_phone, config.encoder_in_out_features)
+        self.encoder = Encoder(config.encoder_type, config.num_chars, config.encoder_params)
         self.neural_hmm = NeuralHMM(
             frame_channels=self.out_channels,
             ar_order=self.ar_order,
             deterministic_transition=self.deterministic_transition,
-            encoder_dim=self.encoder_in_out_features,
+            encoder_dim=self.encoder_params["hidden_channels"],
             prenet_type=self.prenet_type,
             prenet_dim=self.prenet_dim,
             prenet_n_layers=self.prenet_n_layers,

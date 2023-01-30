@@ -99,9 +99,7 @@ class TestOverflowEncoder(unittest.TestCase):
         config = deepcopy(config_global)
         config.state_per_phone = state_per_phone
         config.num_chars = 24
-        return Encoder(config.num_chars, config.state_per_phone, config.prenet_dim, config.encoder_n_convolutions).to(
-            device
-        )
+        return Encoder(config.encoder_type, config.num_chars, config.encoder_params).to(device)
 
     def test_forward_with_state_per_phone_multiplication(self):
         for s_p_p in [1, 2, 3]:
@@ -182,7 +180,7 @@ class TestNeuralHMM(unittest.TestCase):
             config.out_channels,
             config.ar_order,
             config.deterministic_transition if deterministic_transition is None else deterministic_transition,
-            config.encoder_in_out_features,
+            config.encoder_params["hidden_channels"],
             config.prenet_type,
             config.prenet_dim,
             config.prenet_n_layers,
@@ -206,9 +204,9 @@ class TestNeuralHMM(unittest.TestCase):
     @staticmethod
     def _get_embedded_input():
         input_dummy, input_lengths, mel_spec, mel_lengths = _create_inputs()
-        input_dummy = torch.nn.Embedding(config_global.num_chars, config_global.encoder_in_out_features).to(device)(
-            input_dummy
-        )
+        input_dummy = torch.nn.Embedding(config_global.num_chars, config_global.encoder_params["hidden_channels"]).to(
+            device
+        )(input_dummy)
         return input_dummy, input_lengths, mel_spec, mel_lengths
 
     def test_neural_hmm_forward(self):
@@ -274,7 +272,7 @@ class TestNeuralHMM(unittest.TestCase):
             transition_matrix,
             _,
         ) = model._initialize_forward_algorithm_variables(  # pylint: disable=protected-access
-            mel_spec, input_dummy.shape[1] * config_global.state_per_phone
+            mel_spec, input_dummy.shape[1] * config_global.encoder_params["state_per_phone"]
         )
 
         self.assertEqual(log_c.shape, (mel_spec.shape[0], mel_spec.shape[1]))
@@ -283,25 +281,29 @@ class TestNeuralHMM(unittest.TestCase):
             (
                 mel_spec.shape[0],
                 mel_spec.shape[1],
-                input_dummy.shape[1] * config_global.state_per_phone,
+                input_dummy.shape[1] * config_global.encoder_params["state_per_phone"],
             ),
         )
         self.assertEqual(
             transition_matrix.shape,
-            (mel_spec.shape[0], mel_spec.shape[1], input_dummy.shape[1] * config_global.state_per_phone),
+            (
+                mel_spec.shape[0],
+                mel_spec.shape[1],
+                input_dummy.shape[1] * config_global.encoder_params["state_per_phone"],
+            ),
         )
 
     def test_get_absorption_state_scaling_factor(self):
         model = self._get_neural_hmm()
         input_dummy, input_lengths, mel_spec, mel_lengths = self._get_embedded_input()
-        input_lengths = input_lengths * config_global.state_per_phone
+        input_lengths = input_lengths * config_global.encoder_params["state_per_phone"]
         (
             log_c,
             log_alpha_scaled,
             transition_matrix,
             _,
         ) = model._initialize_forward_algorithm_variables(  # pylint: disable=protected-access
-            mel_spec, input_dummy.shape[1] * config_global.state_per_phone
+            mel_spec, input_dummy.shape[1] * config_global.encoder_params["state_per_phone"]
         )
         log_alpha_scaled = torch.rand_like(log_alpha_scaled).clamp(1e-3)
         transition_matrix = torch.randn_like(transition_matrix).sigmoid().log()
@@ -368,7 +370,7 @@ class TestOverflowOutputNet(unittest.TestCase):
     def _get_outputnet():
         config = deepcopy(config_global)
         outputnet = Outputnet(
-            config.encoder_in_out_features,
+            config.encoder_params["hidden_channels"],
             config.memory_rnn_dim,
             config.out_channels,
             config.outputnet_size,
