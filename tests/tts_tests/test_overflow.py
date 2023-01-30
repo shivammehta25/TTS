@@ -77,7 +77,7 @@ class TestOverflow(unittest.TestCase):
         input_dummy, input_lengths, mel_spec, mel_lengths = _create_inputs()
         outputs = model(input_dummy, input_lengths, mel_spec, mel_lengths)
         self.assertEqual(outputs["log_probs"].shape, (input_dummy.shape[0],))
-        self.assertEqual(model.state_per_phone * max(input_lengths), outputs["alignments"].shape[2])
+        self.assertEqual(model.encoder_params["state_per_phone"] * max(input_lengths), outputs["alignments"].shape[2])
 
     def test_inference(self):
         model = get_model()
@@ -97,7 +97,7 @@ class TestOverflowEncoder(unittest.TestCase):
     @staticmethod
     def get_encoder(state_per_phone):
         config = deepcopy(config_global)
-        config.state_per_phone = state_per_phone
+        config.encoder_params["state_per_phone"] = state_per_phone
         config.num_chars = 24
         return Encoder(config.encoder_type, config.num_chars, config.encoder_params).to(device)
 
@@ -382,9 +382,9 @@ class TestOverflowOutputNet(unittest.TestCase):
     @staticmethod
     def _get_embedded_input():
         input_dummy, input_lengths, mel_spec, mel_lengths = _create_inputs()
-        input_dummy = torch.nn.Embedding(config_global.num_chars, config_global.encoder_in_out_features).to(device)(
-            input_dummy
-        )
+        input_dummy = torch.nn.Embedding(config_global.num_chars, config_global.encoder_params["hidden_channels"]).to(
+            device
+        )(input_dummy)
         one_timestep_frame = torch.randn(input_dummy.shape[0], config_global.memory_rnn_dim).to(device)
         return input_dummy, one_timestep_frame
 

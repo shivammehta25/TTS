@@ -26,23 +26,22 @@ class Encoder(nn.Module):
             )
         elif encoder_type == "ffttransformer":
             self.encoder = FFTransformerEncoder(
-                encoder_params.hidden_channels,
-                encoder_params.hidden_channels,
-                encoder_params.encoder_type,
-                encoder_params.encoder_params,
-                encoder_params.embedded_speaker_dim,
+                encoder_params["hidden_channels"],
+                encoder_params["hidden_channels"],
+                encoder_params["encoder_type"],
+                encoder_params["encoder_params"],
+                encoder_params["embedded_speaker_dim"],
             )
         else:
             raise ValueError(f"Not yet tested with other types of encoders {encoder_type}")
 
     def forward(self, x, x_lengths):
-        x = self.emb(x)
+        x = self.emb(x).transpose(1, 2)
         if self.encoder_type == "conv":  # pylint: disable=no-else-return
-            o = x.transpose(1, 2)
-            return self.encoder(o, x_lengths)
+            return self.encoder(x, x_lengths)
         elif self.encoder_type == "ffttransformer":
             x_mask = torch.unsqueeze(sequence_mask(x_lengths, x.shape[1]), 1).float()
-            o = self.encoder(x.transpose(1, -1), x_mask)
+            o = self.encoder(x, x_mask)
             return o, x_lengths
         else:
             raise ValueError(f"Not yet tested with other types of encoders {self.encoder_type}")
@@ -60,6 +59,7 @@ class Encoder(nn.Module):
             Tuple[torch.FloatTensor, torch.LongTensor]: encoder outputs and output lengths.
                 -shape: :math:`((b, T_{in} * states_per_phone, in_out_channels), (b,))`
         """
+        x = self.emb(x).transpose(1, 2)
         if self.encoder_type == "conv":  # pylint: disable=no-else-return
             return self.encoder.inference(x, x_len)
         elif self.encoder_type == "ffttransformer":
@@ -99,9 +99,6 @@ class ConvEncoder(nn.Module):
             bidirectional=True,
         )
         self.rnn_state = None
-        import pdb
-
-        pdb.set_trace()
 
     def forward(self, o: torch.FloatTensor, x_len: torch.LongTensor) -> Tuple[torch.FloatTensor, torch.LongTensor]:
         """Forward pass to the encoder.
@@ -116,27 +113,24 @@ class ConvEncoder(nn.Module):
             Tuple[torch.FloatTensor, torch.LongTensor]: encoder outputs and output lengths.
                 -shape: :math:`((b, T_{in} * states_per_phone, in_out_channels), (b,))`
         """
-        b, T = o.shape[0:2]
+        b, T = o.shape[0], o.shape[2]
         for layer in self.convolutions:
             o = layer(o)
         o = o.transpose(1, 2)
         o = nn.utils.rnn.pack_padded_sequence(o, x_len.cpu(), batch_first=True)
         self.lstm.flatten_parameters()
         o, _ = self.lstm(o)
-        import pdb
-
-        pdb.set_trace()
         o, _ = nn.utils.rnn.pad_packed_sequence(o, batch_first=True)
         o = o.reshape(b, T * self.state_per_phone, self.in_out_channels)
         x_len = x_len * self.state_per_phone
         return o, x_len
 
-    def inference(self, x, x_len):
+    def inference(self, o, x_len):
         """Inference to the encoder.
 
         Args:
-            x (torch.FloatTensor): input text indices.
-                - shape: :math:`(b, T_{in})`
+            o (torch.FloatTensor): input text indices.
+                - shape: :math:`(b, T_{in}, D_emb)`
             x_len (torch.LongTensor): input text lengths.
                 - shape: :math:`(b,)`
 
@@ -144,8 +138,7 @@ class ConvEncoder(nn.Module):
             Tuple[torch.FloatTensor, torch.LongTensor]: encoder outputs and output lengths.
                 -shape: :math:`((b, T_{in} * states_per_phone, in_out_channels), (b,))`
         """
-        b, T = x.shape
-        o = self.emb(x).transpose(1, 2)
+        b, T = o.shape[0], o.shape[2]
         for layer in self.convolutions:
             o = layer(o)
         o = o.transpose(1, 2)
