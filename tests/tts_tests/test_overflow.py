@@ -77,7 +77,10 @@ class TestOverflow(unittest.TestCase):
         input_dummy, input_lengths, mel_spec, mel_lengths = _create_inputs()
         outputs = model(input_dummy, input_lengths, mel_spec, mel_lengths)
         self.assertEqual(outputs["log_probs"].shape, (input_dummy.shape[0],))
-        self.assertEqual(model.encoder_params["state_per_phone"] * max(input_lengths), outputs["alignments"].shape[2])
+        self.assertEqual(
+            (model.encoder_params["state_per_phone"] if model.encoder_type == "conv" else 1) * max(input_lengths),
+            outputs["alignments"].shape[2],
+        )
 
     def test_inference(self):
         model = get_model()
@@ -97,11 +100,15 @@ class TestOverflowEncoder(unittest.TestCase):
     @staticmethod
     def get_encoder(state_per_phone):
         config = deepcopy(config_global)
-        config.encoder_params["state_per_phone"] = state_per_phone
+        if config.encoder_type == "conv":
+            config.encoder_params["state_per_phone"] = state_per_phone
+
         config.num_chars = 24
         return Encoder(config.encoder_type, config.num_chars, config.encoder_params).to(device)
 
     def test_forward_with_state_per_phone_multiplication(self):
+        if config_global.encoder_type != "conv":
+            self.skipTest("This test is only for conv encoder")
         for s_p_p in [1, 2, 3]:
             input_dummy, input_lengths, _, _ = _create_inputs()
             model = self.get_encoder(s_p_p)
@@ -109,6 +116,9 @@ class TestOverflowEncoder(unittest.TestCase):
             self.assertEqual(x.shape[1], input_dummy.shape[1] * s_p_p)
 
     def test_inference_with_state_per_phone_multiplication(self):
+        if config_global.encoder_type != "conv":
+            self.skipTest("This test is only for conv encoder")
+
         for s_p_p in [1, 2, 3]:
             input_dummy, input_lengths, _, _ = _create_inputs()
             model = self.get_encoder(s_p_p)
@@ -272,7 +282,9 @@ class TestNeuralHMM(unittest.TestCase):
             transition_matrix,
             _,
         ) = model._initialize_forward_algorithm_variables(  # pylint: disable=protected-access
-            mel_spec, input_dummy.shape[1] * config_global.encoder_params["state_per_phone"]
+            mel_spec,
+            input_dummy.shape[1]
+            * (config_global.encoder_params["state_per_phone"] if config_global.encoder_type == "conv" else 1),
         )
 
         self.assertEqual(log_c.shape, (mel_spec.shape[0], mel_spec.shape[1]))
@@ -281,7 +293,8 @@ class TestNeuralHMM(unittest.TestCase):
             (
                 mel_spec.shape[0],
                 mel_spec.shape[1],
-                input_dummy.shape[1] * config_global.encoder_params["state_per_phone"],
+                input_dummy.shape[1]
+                * (config_global.encoder_params["state_per_phone"] if config_global.encoder_type == "conv" else 1),
             ),
         )
         self.assertEqual(
@@ -289,21 +302,26 @@ class TestNeuralHMM(unittest.TestCase):
             (
                 mel_spec.shape[0],
                 mel_spec.shape[1],
-                input_dummy.shape[1] * config_global.encoder_params["state_per_phone"],
+                input_dummy.shape[1]
+                * (config_global.encoder_params["state_per_phone"] if config_global.encoder_type == "conv" else 1),
             ),
         )
 
     def test_get_absorption_state_scaling_factor(self):
         model = self._get_neural_hmm()
         input_dummy, input_lengths, mel_spec, mel_lengths = self._get_embedded_input()
-        input_lengths = input_lengths * config_global.encoder_params["state_per_phone"]
+        input_lengths = input_lengths * (
+            config_global.encoder_params["state_per_phone"] if config_global.encoder_type == "conv" else 1
+        )
         (
             log_c,
             log_alpha_scaled,
             transition_matrix,
             _,
         ) = model._initialize_forward_algorithm_variables(  # pylint: disable=protected-access
-            mel_spec, input_dummy.shape[1] * config_global.encoder_params["state_per_phone"]
+            mel_spec,
+            input_dummy.shape[1]
+            * (config_global.encoder_params["state_per_phone"] if config_global.encoder_type == "conv" else 1),
         )
         log_alpha_scaled = torch.rand_like(log_alpha_scaled).clamp(1e-3)
         transition_matrix = torch.randn_like(transition_matrix).sigmoid().log()

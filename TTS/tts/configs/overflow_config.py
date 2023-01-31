@@ -122,15 +122,21 @@ class OverflowConfig(BaseTTSConfig):  # The classname has to be camel case
     mel_statistics_parameter_path: str = None
 
     # Encoder parameters
-    encoder_type: str = "conv"
-    encoder_params: dict = field(
-        default_factory=lambda: {"state_per_phone": 2, "hidden_channels": 512, "encoder_n_convolutions": 3}
-    )
-    num_chars: int = None
-    # encoder_type: str = "fftransformer"
-    # fft_encoder_params: dict = field(
-    # default_factory=lambda: {"hidden_channels": 384,  "hidden_channels_ffn": 1024, "num_heads": 1, "num_layers": 6, "dropout_p": 0.1}
+    # encoder_type: str = "conv"
+    # encoder_params: dict = field(
+    # default_factory=lambda: {"state_per_phone": 2, "hidden_channels": 512, "encoder_n_convolutions": 3}
     # )
+    num_chars: int = None
+    encoder_type: str = "fftransformer"
+    encoder_params: dict = field(
+        default_factory=lambda: {
+            "hidden_channels": 384,
+            "hidden_channels_ffn": 1024,
+            "num_heads": 1,
+            "num_layers": 6,
+            "dropout_p": 0.1,
+        }
+    )
 
     # HMM parameters
     out_channels: int = 80

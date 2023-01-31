@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import List, Tuple
 
 import torch
@@ -6,6 +7,7 @@ from torch import nn
 from tqdm.auto import tqdm
 
 from TTS.tts.layers.feed_forward.encoder import Encoder as FFTransformerEncoder
+from TTS.tts.layers.generic.pos_encoding import PositionalEncoding
 from TTS.tts.layers.tacotron.common_layers import Linear
 from TTS.tts.layers.tacotron.tacotron2 import ConvBNBlock
 from TTS.tts.utils.helpers import sequence_mask
@@ -15,6 +17,7 @@ class Encoder(nn.Module):
     def __init__(self, encoder_type, num_chars, encoder_params) -> None:
         super().__init__()
         self.encoder_type = encoder_type
+        encoder_params = deepcopy(encoder_params)
 
         self.emb = nn.Embedding(num_chars, encoder_params["hidden_channels"])
 
@@ -24,27 +27,55 @@ class Encoder(nn.Module):
                 encoder_params["hidden_channels"],
                 encoder_params["encoder_n_convolutions"],
             )
-        elif encoder_type == "ffttransformer":
+        elif encoder_type == "fftransformer":
+            hidden_channels = encoder_params["hidden_channels"]
+            del encoder_params["hidden_channels"]
+            self.pos_encoder = PositionalEncoding(hidden_channels)
             self.encoder = FFTransformerEncoder(
-                encoder_params["hidden_channels"],
-                encoder_params["hidden_channels"],
-                encoder_params["encoder_type"],
-                encoder_params["encoder_params"],
-                encoder_params["embedded_speaker_dim"],
+                hidden_channels,
+                hidden_channels,
+                encoder_type,
+                encoder_params,
             )
         else:
             raise ValueError(f"Not yet tested with other types of encoders {encoder_type}")
 
     def forward(self, x, x_lengths):
+        """Forward pass for the encoder.
+
+        Args:
+            x (torch.LongTensor): input text indices.
+            x_lengths (torch.LongTensor): input text lengths.
+
+        Returns:
+            Tuple[torch.FloatTensor, torch.LongTensor]: encoder outputs and output lengths.
+                -shape: :math:`((b, T_{in} * states_per_phone, in_out_channels), (b,))`
+        """
         x = self.emb(x).transpose(1, 2)
         if self.encoder_type == "conv":  # pylint: disable=no-else-return
             return self.encoder(x, x_lengths)
-        elif self.encoder_type == "ffttransformer":
-            x_mask = torch.unsqueeze(sequence_mask(x_lengths, x.shape[1]), 1).float()
-            o = self.encoder(x, x_mask)
-            return o, x_lengths
+        elif self.encoder_type == "fftransformer":
+            return self._fft_forward(x, x_lengths)
         else:
             raise ValueError(f"Not yet tested with other types of encoders {self.encoder_type}")
+
+    def _fft_forward(self, x, x_lengths):
+        """Forward pass for the FFT encoder.
+
+        Args:
+            x (torch.FloatTensor): Embedding inputs.
+                - shape: :math:`(b, in_out_channels, T_{in})`
+            x_lengths (torch.LongTensor): input text lengths.
+                - shape: :math:`(b,)`
+
+        Returns:
+            Tuple[torch.FloatTensor, torch.LongTensor]: encoder outputs and output lengths.
+                - shape: :math:`((b, T_{in}, in_out_channels), (b,))`
+        """
+        x_mask = torch.unsqueeze(sequence_mask(x_lengths, x.shape[2]), 1).float()
+        x = self.pos_encoder(x, x_mask)
+        o = self.encoder(x, x_mask)
+        return o.transpose(1, 2), x_lengths
 
     def inference(self, x, x_len):
         """Inference to the encoder.
@@ -62,8 +93,8 @@ class Encoder(nn.Module):
         x = self.emb(x).transpose(1, 2)
         if self.encoder_type == "conv":  # pylint: disable=no-else-return
             return self.encoder.inference(x, x_len)
-        elif self.encoder_type == "ffttransformer":
-            return self(x, x_len)
+        elif self.encoder_type == "fftransformer":
+            return self._fft_forward(x, x_len)
         else:
             raise ValueError(f"Not yet tested with other types of encoders {self.encoder_type}")
 
