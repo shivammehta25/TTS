@@ -110,6 +110,11 @@ class Overflow(BaseTTS):
         self.register_buffer("mean", torch.tensor(0))
         self.register_buffer("std", torch.tensor(1))
 
+        # Turn off encoder training
+        for param in self.encoder.parameters():
+            param.requires_grad = False
+        self.encoder_freezed = True
+
     def update_mean_std(self, statistics_dict: Dict):
         self.mean.data = torch.tensor(statistics_dict["mean"])
         self.std.data = torch.tensor(statistics_dict["std"])
@@ -165,6 +170,14 @@ class Overflow(BaseTTS):
         return stats
 
     def train_step(self, batch: dict, criterion: nn.Module):
+        #! TODO: do a lot of good so karma doesn't gets you for writing this
+        if self.encoder_freezed:
+            if hasattr(self, "steps"):
+                if self.steps >= 1500:
+                    for param in self.encoder.parameters():
+                        param.requires_grad = True
+                    self.encoder_freezed = False
+
         text_input = batch["text_input"]
         text_lengths = batch["text_lengths"]
         mel_input = batch["mel_input"]
@@ -176,10 +189,11 @@ class Overflow(BaseTTS):
             mels=mel_input,
             mel_len=mel_lengths,
         )
-        loss_dict = criterion(outputs["log_probs"] / (mel_lengths.sum() + text_lengths.sum()))
+        loss_dict = criterion(outputs["log_probs"])
 
         # for printing useful statistics on terminal
         loss_dict.update(self._training_stats(batch))
+        loss_dict.update({"encoder_frozen": self.encoder_freezed})
         return outputs, loss_dict
 
     def eval_step(self, batch: Dict, criterion: nn.Module):
@@ -358,6 +372,7 @@ class Overflow(BaseTTS):
         figures, audios = self._create_logs(batch, outputs, self.ap)
         logger.train_figures(steps, figures)
         logger.train_audios(steps, audios, self.ap.sample_rate)
+        self.steps = steps
 
     def eval_log(
         self, batch: Dict, outputs: Dict, logger: "Logger", assets: Dict, steps: int
@@ -373,12 +388,14 @@ class Overflow(BaseTTS):
         figures, audios = self._create_logs(batch, outputs, self.ap)
         logger.eval_figures(steps, figures)
         logger.eval_audios(steps, audios, self.ap.sample_rate)
+        self.steps = steps
 
     def test_log(
         self, outputs: dict, logger: "Logger", assets: dict, steps: int  # pylint: disable=unused-argument
     ) -> None:
         logger.test_audios(steps, outputs[1], self.ap.sample_rate)
         logger.test_figures(steps, outputs[0])
+        self.steps = steps
 
 
 class NLLLoss(nn.Module):

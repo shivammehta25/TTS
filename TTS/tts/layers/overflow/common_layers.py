@@ -37,6 +37,19 @@ class Encoder(nn.Module):
                 encoder_type,
                 encoder_params,
             )
+        elif encoder_type == "relative_position_transformer" or encoder_type == "residual_conv_bn":
+            hidden_channels = encoder_params["hidden_channels"]
+            del encoder_params["hidden_channels"]
+            self.encoder = FFTransformerEncoder(
+                hidden_channels,
+                hidden_channels,
+                encoder_type,
+                encoder_params,
+            )
+        elif encoder_type == "none":
+
+            pass
+
         else:
             raise ValueError(f"Not yet tested with other types of encoders {encoder_type}")
 
@@ -54,8 +67,14 @@ class Encoder(nn.Module):
         x = self.emb(x).transpose(1, 2)
         if self.encoder_type == "conv":  # pylint: disable=no-else-return
             return self.encoder(x, x_lengths)
-        elif self.encoder_type == "fftransformer":
+        elif (
+            self.encoder_type == "fftransformer"
+            or self.encoder_type == "relative_position_transformer"
+            or self.encoder_type == "residual_conv_bn"
+        ):
             return self._fft_forward(x, x_lengths)
+        elif self.encoder_type == "none":
+            return x.transpose(1, 2), x_lengths
         else:
             raise ValueError(f"Not yet tested with other types of encoders {self.encoder_type}")
 
@@ -73,7 +92,8 @@ class Encoder(nn.Module):
                 - shape: :math:`((b, T_{in}, in_out_channels), (b,))`
         """
         x_mask = torch.unsqueeze(sequence_mask(x_lengths, x.shape[2]), 1).float()
-        x = self.pos_encoder(x, x_mask)
+        if hasattr(self, "pos_encoder"):
+            x = self.pos_encoder(x, x_mask)
         o = self.encoder(x, x_mask)
         return o.transpose(1, 2), x_lengths
 
@@ -93,8 +113,14 @@ class Encoder(nn.Module):
         x = self.emb(x).transpose(1, 2)
         if self.encoder_type == "conv":  # pylint: disable=no-else-return
             return self.encoder.inference(x, x_len)
-        elif self.encoder_type == "fftransformer":
+        elif (
+            self.encoder_type == "fftransformer"
+            or self.encoder_type == "relative_position_transformer"
+            or self.encoder_type == "residual_conv_bn"
+        ):
             return self._fft_forward(x, x_len)
+        elif self.encoder_type == "none":
+            return x.transpose(1, 2), x_len
         else:
             raise ValueError(f"Not yet tested with other types of encoders {self.encoder_type}")
 

@@ -137,6 +137,27 @@ class OverflowConfig(BaseTTSConfig):  # The classname has to be camel case
             "dropout_p": 0.1,
         }
     )
+    # encoder_type: str = "residual_conv_bn"
+    # encoder_params: dict = field(
+    #     default_factory=lambda: {
+    #         "hidden_channels": 192,
+    #         "kernel_size": 3,
+    #         "dropout_p": 0.1,
+    #         "num_layers": 6,
+    #         "num_heads": 2,
+    #         "hidden_channels_ffn": 768,
+    #         "input_length": None,
+    #     }
+    # )
+
+    # encoder_type: str = "residual_conv_bn"
+    # encoder_params: dict = field( default_factory= lambda: {
+    #         "hidden_channels": 192,
+    #         "kernel_size": 4,
+    #         "dilations": 4 * [1, 2, 4] + [1],
+    #         "num_conv_blocks": 2,
+    #         "num_res_blocks": 13
+    # })
 
     # HMM parameters
     out_channels: int = 80
@@ -174,10 +195,11 @@ class OverflowConfig(BaseTTSConfig):  # The classname has to be camel case
 
     # optimizer parameters
     optimizer: str = "Adam"
-    optimizer_params: dict = field(default_factory=lambda: {"weight_decay": 1e-6})
+    optimizer_params: dict = field(default_factory=lambda: {"betas": [0.9, 0.98], "weight_decay": 1e-6})
     grad_clip: float = 40000.0
+    lr_scheduler: str = "NoamLR"
+    lr_scheduler_params: dict = field(default_factory=lambda: {"warmup_steps": 1000})
     lr: float = 1e-3
-    lr_scheduler: str = None
 
     # overrides
     min_text_len: int = 10

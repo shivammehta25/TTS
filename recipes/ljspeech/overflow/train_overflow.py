@@ -31,7 +31,8 @@ audio_config = BaseAudioConfig(
 )
 
 config = OverflowConfig(  # This is the config that is saved for the future use
-    run_name="overflow_ljspeech",
+    run_name="Frozen_Unfrozen_encoder",
+    # run_eval_steps=10,
     audio=audio_config,
     batch_size=30,
     eval_batch_size=16,
