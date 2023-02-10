@@ -110,10 +110,7 @@ class Overflow(BaseTTS):
         self.register_buffer("mean", torch.tensor(0))
         self.register_buffer("std", torch.tensor(1))
 
-        # Turn off encoder training
-        for param in self.encoder.parameters():
-            param.requires_grad = False
-        self.encoder_freezed = True
+        self.encoder_freezed = False
 
     def update_mean_std(self, statistics_dict: Dict):
         self.mean.data = torch.tensor(statistics_dict["mean"])
@@ -171,12 +168,12 @@ class Overflow(BaseTTS):
 
     def train_step(self, batch: dict, criterion: nn.Module):
         #! TODO: do a lot of good so karma doesn't gets you for writing this
-        if self.encoder_freezed:
-            if hasattr(self, "steps"):
-                if self.steps >= 1500:
-                    for param in self.encoder.parameters():
-                        param.requires_grad = True
-                    self.encoder_freezed = False
+        # if self.encoder_freezed:
+        #     if hasattr(self, "steps"):
+        #         if self.steps >= 1500:
+        #             for param in self.encoder.parameters():
+        #                 param.requires_grad = True
+        #             self.encoder_freezed = False
 
         text_input = batch["text_input"]
         text_lengths = batch["text_lengths"]
@@ -372,7 +369,6 @@ class Overflow(BaseTTS):
         figures, audios = self._create_logs(batch, outputs, self.ap)
         logger.train_figures(steps, figures)
         logger.train_audios(steps, audios, self.ap.sample_rate)
-        self.steps = steps
 
     def eval_log(
         self, batch: Dict, outputs: Dict, logger: "Logger", assets: Dict, steps: int
@@ -388,14 +384,12 @@ class Overflow(BaseTTS):
         figures, audios = self._create_logs(batch, outputs, self.ap)
         logger.eval_figures(steps, figures)
         logger.eval_audios(steps, audios, self.ap.sample_rate)
-        self.steps = steps
 
     def test_log(
         self, outputs: dict, logger: "Logger", assets: dict, steps: int  # pylint: disable=unused-argument
     ) -> None:
         logger.test_audios(steps, outputs[1], self.ap.sample_rate)
         logger.test_figures(steps, outputs[0])
-        self.steps = steps
 
 
 class NLLLoss(nn.Module):
