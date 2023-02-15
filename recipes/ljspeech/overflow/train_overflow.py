@@ -31,7 +31,7 @@ audio_config = BaseAudioConfig(
 )
 
 config = OverflowConfig(  # This is the config that is saved for the future use
-    run_name="Frozen_Unfrozen_encoder",
+    run_name="FPEncoder",
     # run_eval_steps=10,
     audio=audio_config,
     batch_size=30,
@@ -53,6 +53,7 @@ config = OverflowConfig(  # This is the config that is saved for the future use
     mixed_precision=True,
     output_path=output_path,
     datasets=[dataset_config],
+    add_blank=True,
 )
 
 # INITIALIZE THE AUDIO PROCESSOR

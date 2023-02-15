@@ -8,9 +8,37 @@ from tqdm.auto import tqdm
 
 from TTS.tts.layers.feed_forward.encoder import Encoder as FFTransformerEncoder
 from TTS.tts.layers.generic.pos_encoding import PositionalEncoding
+from TTS.tts.layers.overflow.transformer import FFTransformer
 from TTS.tts.layers.tacotron.common_layers import Linear
 from TTS.tts.layers.tacotron.tacotron2 import ConvBNBlock
 from TTS.tts.utils.helpers import sequence_mask
+
+
+class FPEncoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.encoder = FFTransformer(
+            n_layer=6,
+            n_head=1,
+            d_model=384,
+            d_head=64,
+            d_inner=1024,
+            kernel_size=3,
+            dropout=0.1,
+            dropatt=0.1,
+            dropemb=0.0,
+            embed_input=False,
+            n_embed=384,
+            pre_lnorm=True,
+        )
+
+    def forward(self, x, input_lengths):
+        x, enc_mask = self.encoder(x, seq_lens=input_lengths)
+        return x, input_lengths
+
+    def inference(self, x, input_lengths):
+        return self.forward(x, input_lengths)
 
 
 class Encoder(nn.Module):
@@ -28,15 +56,17 @@ class Encoder(nn.Module):
                 encoder_params["encoder_n_convolutions"],
             )
         elif encoder_type == "fftransformer":
-            hidden_channels = encoder_params["hidden_channels"]
-            del encoder_params["hidden_channels"]
-            self.pos_encoder = PositionalEncoding(hidden_channels)
-            self.encoder = FFTransformerEncoder(
-                hidden_channels,
-                hidden_channels,
-                encoder_type,
-                encoder_params,
-            )
+            self.encoder = FPEncoder()
+
+            # hidden_channels = encoder_params["hidden_channels"]
+            # del encoder_params["hidden_channels"]
+            # self.pos_encoder = PositionalEncoding(hidden_channels)
+            # self.encoder = FFTransformerEncoder(
+            #     hidden_channels,
+            #     hidden_channels,
+            #     encoder_type,
+            #     encoder_params,
+            # )
         elif encoder_type == "relative_position_transformer" or encoder_type == "residual_conv_bn":
             hidden_channels = encoder_params["hidden_channels"]
             del encoder_params["hidden_channels"]
@@ -91,11 +121,11 @@ class Encoder(nn.Module):
             Tuple[torch.FloatTensor, torch.LongTensor]: encoder outputs and output lengths.
                 - shape: :math:`((b, T_{in}, in_out_channels), (b,))`
         """
-        x_mask = torch.unsqueeze(sequence_mask(x_lengths, x.shape[2]), 1).float()
-        if hasattr(self, "pos_encoder"):
-            x = self.pos_encoder(x, x_mask)
-        o = self.encoder(x, x_mask)
-        return o.transpose(1, 2), x_lengths
+        # x_mask = torch.unsqueeze(sequence_mask(x_lengths, x.shape[2]), 1).float()
+        # if hasattr(self, "pos_encoder"):
+        #     x = self.pos_encoder(x, x_mask)
+        o, x_lengths = self.encoder(x, x_lengths)
+        return o, x_lengths
 
     def inference(self, x, x_len):
         """Inference to the encoder.

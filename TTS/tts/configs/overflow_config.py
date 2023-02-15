@@ -194,11 +194,12 @@ class OverflowConfig(BaseTTSConfig):  # The classname has to be camel case
     c_in_channels: int = 0
 
     # optimizer parameters
-    optimizer: str = "Adam"
-    optimizer_params: dict = field(default_factory=lambda: {"betas": [0.9, 0.98], "weight_decay": 1e-6})
+    # optimizer: str = "Adam"
+    optimizer_params: dict = field(default_factory=lambda: {"betas": [0.9, 0.98], "weight_decay": 1e-6, "eps": 1e-9})
     grad_clip: float = 40000.0
-    lr_scheduler: str = "NoamLR"
-    lr_scheduler_params: dict = field(default_factory=lambda: {"warmup_steps": 1000})
+    # lr_scheduler: str = "NoamLR"
+    # scheduler="naom"
+    # lr_scheduler_params: dict = field(default_factory=lambda: {"warmup_steps": 4000})
     lr: float = 1e-3
 
     # overrides
