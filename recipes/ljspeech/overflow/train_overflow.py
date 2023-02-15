@@ -31,7 +31,7 @@ audio_config = BaseAudioConfig(
 )
 
 config = OverflowConfig(  # This is the config that is saved for the future use
-    run_name="overflow_ljspeech",
+    run_name="GlowEncoder_NOLR",
     audio=audio_config,
     batch_size=30,
     eval_batch_size=16,
@@ -43,7 +43,7 @@ config = OverflowConfig(  # This is the config that is saved for the future use
     text_cleaner="phoneme_cleaners",
     use_phonemes=True,
     phoneme_language="en-us",
-    phoneme_cache_path=os.path.join(output_path, "phoneme_cache"),
+    phoneme_cache_path=os.path.join(output_path, "phoneme_cache_blank"),
     precompute_num_workers=8,
     mel_statistics_parameter_path=os.path.join(output_path, "lj_parameters.pt"),
     force_generate_statistics=False,
@@ -52,6 +52,10 @@ config = OverflowConfig(  # This is the config that is saved for the future use
     mixed_precision=True,
     output_path=output_path,
     datasets=[dataset_config],
+    # lr_scheduler="my_naom",
+    # lr_scheduler_params={"warmup_steps": 1000},
+    encoder_type="rel_pos_transformer",
+    # lr=0.005
 )
 
 # INITIALIZE THE AUDIO PROCESSOR

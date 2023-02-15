@@ -6,7 +6,7 @@ from coqpit import Coqpit
 from torch import nn
 from trainer.logging.tensorboard_logger import TensorboardLogger
 
-from TTS.tts.layers.overflow.common_layers import Encoder, OverflowUtils
+from TTS.tts.layers.overflow.common_layers import ConvEncoder, OverflowUtils
 from TTS.tts.layers.overflow.neural_hmm import NeuralHMM
 from TTS.tts.layers.overflow.plotting_utils import (
     get_spec_from_most_probable_state,
@@ -77,7 +77,7 @@ class NeuralhmmTTS(BaseTTS):
         for key in config:
             setattr(self, key, config[key])
 
-        self.encoder = Encoder(config.num_chars, config.state_per_phone, config.encoder_in_out_features)
+        self.encoder = ConvEncoder(config.num_chars, config.state_per_phone, config.encoder_in_out_features)
         self.neural_hmm = NeuralHMM(
             frame_channels=self.out_channels,
             ar_order=self.ar_order,

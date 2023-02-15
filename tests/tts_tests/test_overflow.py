@@ -95,25 +95,24 @@ class TestOverflow(unittest.TestCase):
 
 class TestOverflowEncoder(unittest.TestCase):
     @staticmethod
-    def get_encoder(state_per_phone):
+    def get_conv_encoder(state_per_phone):
         config = deepcopy(config_global)
-        config.state_per_phone = state_per_phone
+        config.encoder_type = "conv"
+        config.encoder_params[config.encoder_type]["state_per_phone"] = state_per_phone
         config.num_chars = 24
-        return Encoder(config.num_chars, config.state_per_phone, config.prenet_dim, config.encoder_n_convolutions).to(
-            device
-        )
+        return Encoder(config.num_chars, config.encoder_type, config.encoder_params).to(device)
 
     def test_forward_with_state_per_phone_multiplication(self):
         for s_p_p in [1, 2, 3]:
             input_dummy, input_lengths, _, _ = _create_inputs()
-            model = self.get_encoder(s_p_p)
+            model = self.get_conv_encoder(s_p_p)
             x, x_len = model(input_dummy, input_lengths)
             self.assertEqual(x.shape[1], input_dummy.shape[1] * s_p_p)
 
     def test_inference_with_state_per_phone_multiplication(self):
         for s_p_p in [1, 2, 3]:
             input_dummy, input_lengths, _, _ = _create_inputs()
-            model = self.get_encoder(s_p_p)
+            model = self.get_conv_encoder(s_p_p)
             x, x_len = model.inference(input_dummy, input_lengths)
             self.assertEqual(x.shape[1], input_dummy.shape[1] * s_p_p)
 
@@ -182,7 +181,7 @@ class TestNeuralHMM(unittest.TestCase):
             config.out_channels,
             config.ar_order,
             config.deterministic_transition if deterministic_transition is None else deterministic_transition,
-            config.encoder_in_out_features,
+            config.encoder_params[config.encoder_type]["hidden_channels"],
             config.prenet_type,
             config.prenet_dim,
             config.prenet_n_layers,
@@ -206,9 +205,9 @@ class TestNeuralHMM(unittest.TestCase):
     @staticmethod
     def _get_embedded_input():
         input_dummy, input_lengths, mel_spec, mel_lengths = _create_inputs()
-        input_dummy = torch.nn.Embedding(config_global.num_chars, config_global.encoder_in_out_features).to(device)(
-            input_dummy
-        )
+        input_dummy = torch.nn.Embedding(
+            config_global.num_chars, config_global.encoder_params[config_global.encoder_type]["hidden_channels"]
+        ).to(device)(input_dummy)
         return input_dummy, input_lengths, mel_spec, mel_lengths
 
     def test_neural_hmm_forward(self):
@@ -368,7 +367,7 @@ class TestOverflowOutputNet(unittest.TestCase):
     def _get_outputnet():
         config = deepcopy(config_global)
         outputnet = Outputnet(
-            config.encoder_in_out_features,
+            config.encoder_params[config.encoder_type]["hidden_channels"],
             config.memory_rnn_dim,
             config.out_channels,
             config.outputnet_size,
@@ -380,9 +379,9 @@ class TestOverflowOutputNet(unittest.TestCase):
     @staticmethod
     def _get_embedded_input():
         input_dummy, input_lengths, mel_spec, mel_lengths = _create_inputs()
-        input_dummy = torch.nn.Embedding(config_global.num_chars, config_global.encoder_in_out_features).to(device)(
-            input_dummy
-        )
+        input_dummy = torch.nn.Embedding(
+            config_global.num_chars, config_global.encoder_params[config_global.encoder_type]["hidden_channels"]
+        ).to(device)(input_dummy)
         one_timestep_frame = torch.randn(input_dummy.shape[0], config_global.memory_rnn_dim).to(device)
         return input_dummy, one_timestep_frame
 

@@ -1,3 +1,5 @@
+import math
+from copy import deepcopy
 from typing import List, Tuple
 
 import torch
@@ -5,11 +7,81 @@ import torch.nn.functional as F
 from torch import nn
 from tqdm.auto import tqdm
 
+from TTS.tts.layers.glow_tts.glow import ResidualConv1dLayerNormBlock
+from TTS.tts.layers.glow_tts.transformer import RelativePositionTransformer
+
+# from TTS.tts.layers.glow_tts.encoder import Encoder as R
 from TTS.tts.layers.tacotron.common_layers import Linear
 from TTS.tts.layers.tacotron.tacotron2 import ConvBNBlock
+from TTS.tts.utils.helpers import sequence_mask
 
 
 class Encoder(nn.Module):
+    """Wrapper for encoders"""
+
+    def __init__(self, num_chars, encoder_type, encoder_params) -> None:
+        super().__init__()
+        encoder_params = deepcopy(encoder_params)
+        if encoder_type == "conv":
+            self.encoder = ConvEncoder(num_chars, **encoder_params[encoder_type])
+        elif encoder_type == "rel_pos_transformer":
+            self.encoder = RelPosTransformerEncoder(num_chars=num_chars, encoder_params=encoder_params[encoder_type])
+
+    def forward(self, x: torch.FloatTensor, x_len: torch.LongTensor) -> Tuple[torch.FloatTensor, torch.LongTensor]:
+        return self.encoder(x, x_len)
+
+    def inference(self, *args, **kwargs):
+        return self.encoder.inference(*args, **kwargs)
+
+
+class RelPosTransformerEncoder(nn.Module):
+    def __init__(self, num_chars, encoder_params) -> None:
+        super().__init__()
+
+        self.hidden_channels = encoder_params["hidden_channels"]
+
+        self.embedding = nn.Embedding(num_chars, encoder_params["hidden_channels"])
+        if encoder_params["use_prenet"]:
+            self.prenet = ResidualConv1dLayerNormBlock(
+                encoder_params["hidden_channels"],
+                encoder_params["hidden_channels"],
+                encoder_params["hidden_channels"],
+                kernel_size=5,
+                num_layers=3,
+                dropout_p=0.5,
+            )
+        del encoder_params["hidden_channels"]
+        del encoder_params["use_prenet"]
+        self.encoder = RelativePositionTransformer(
+            self.hidden_channels, self.hidden_channels, self.hidden_channels, **encoder_params
+        )
+
+    def forward(self, x: torch.FloatTensor, x_len: torch.LongTensor) -> Tuple[torch.FloatTensor, torch.LongTensor]:
+        """Forward pass to the encoder.
+
+        Args:
+            x (torch.FloatTensor): input text indices.
+                - shape: :math:`(b, T_{in})`
+            x_len (torch.LongTensor): input text lengths.
+                - shape: :math:`(b,)`
+
+        Returns:
+            Tuple[torch.FloatTensor, torch.LongTensor]: encoder outputs and output lengths.
+                -shape: :math:`((b, T_{in}, in_out_channels), (b,))`
+        """
+        x = self.embedding(x) * math.sqrt(self.hidden_channels)
+        x = x.transpose(1, 2)
+        x_mask = torch.unsqueeze(sequence_mask(x_len, x.size(2)), 1).to(x.dtype)
+        if hasattr(self, "prenet"):
+            x = self.prenet(x, x_mask)
+        x = self.encoder(x, x_mask)
+        return x.transpose(1, 2), x_len
+
+    def inference(self, x, x_len):
+        return self(x, x_len)
+
+
+class ConvEncoder(nn.Module):
     r"""Neural HMM Encoder
 
     Same as Tacotron 2 encoder but increases the input length by states per phone
@@ -21,19 +93,19 @@ class Encoder(nn.Module):
         n_convolutions (int): number of convolutional layers.
     """
 
-    def __init__(self, num_chars, state_per_phone, in_out_channels=512, n_convolutions=3):
+    def __init__(self, num_chars, state_per_phone, hidden_channels=512, n_convolutions=3):
         super().__init__()
 
         self.state_per_phone = state_per_phone
-        self.in_out_channels = in_out_channels
+        self.in_out_channels = hidden_channels
 
-        self.emb = nn.Embedding(num_chars, in_out_channels)
+        self.emb = nn.Embedding(num_chars, hidden_channels)
         self.convolutions = nn.ModuleList()
         for _ in range(n_convolutions):
-            self.convolutions.append(ConvBNBlock(in_out_channels, in_out_channels, 5, "relu"))
+            self.convolutions.append(ConvBNBlock(hidden_channels, hidden_channels, 5, "relu"))
         self.lstm = nn.LSTM(
-            in_out_channels,
-            int(in_out_channels / 2) * state_per_phone,
+            hidden_channels,
+            int(hidden_channels / 2) * state_per_phone,
             num_layers=1,
             batch_first=True,
             bias=True,

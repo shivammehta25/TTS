@@ -124,9 +124,28 @@ class OverflowConfig(BaseTTSConfig):  # The classname has to be camel case
     # Encoder parameters
     num_chars: int = None
     state_per_phone: int = 2
-    encoder_in_out_features: int = 512
     encoder_n_convolutions: int = 3
 
+    encoder_type: str = "conv"
+    encoder_params: dict = field(
+        default_factory=lambda: {
+            "conv": {
+                "state_per_phone": 2,
+                "hidden_channels": 512,
+                "n_convolutions": 3,
+            },
+            "rel_pos_transformer": {
+                "kernel_size": 3,
+                "dropout_p": 0.1,
+                "num_layers": 6,
+                "num_heads": 2,
+                "hidden_channels_ffn": 768,
+                ## Remove the following to intitialize the model later in code
+                "hidden_channels": 192,
+                "use_prenet": True,
+            },
+        }
+    )
     # HMM parameters
     out_channels: int = 80
     ar_order: int = 1
@@ -167,6 +186,7 @@ class OverflowConfig(BaseTTSConfig):  # The classname has to be camel case
     grad_clip: float = 40000.0
     lr: float = 1e-3
     lr_scheduler: str = None
+    scheduler_after_epoch: bool = False
 
     # overrides
     min_text_len: int = 10

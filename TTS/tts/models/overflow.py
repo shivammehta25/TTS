@@ -1,4 +1,5 @@
 import os
+from functools import partial
 from typing import Dict, List, Union
 
 import torch
@@ -76,12 +77,12 @@ class Overflow(BaseTTS):
 
         self.decoder_output_dim = config.out_channels
 
-        self.encoder = Encoder(config.num_chars, config.state_per_phone, config.encoder_in_out_features)
+        self.encoder = Encoder(config.num_chars, config.encoder_type, config.encoder_params)
         self.neural_hmm = NeuralHMM(
             frame_channels=self.out_channels,
             ar_order=self.ar_order,
             deterministic_transition=self.deterministic_transition,
-            encoder_dim=self.encoder_in_out_features,
+            encoder_dim=self.encoder_params[self.encoder_type]["hidden_channels"],
             prenet_type=self.prenet_type,
             prenet_dim=self.prenet_dim,
             prenet_n_layers=self.prenet_n_layers,
@@ -110,6 +111,7 @@ class Overflow(BaseTTS):
 
         self.register_buffer("mean", torch.tensor(0))
         self.register_buffer("std", torch.tensor(1))
+        self.max_gpu_usage = 0
 
     def update_mean_std(self, statistics_dict: Dict):
         self.mean.data = torch.tensor(statistics_dict["mean"])
@@ -156,6 +158,13 @@ class Overflow(BaseTTS):
 
         return outputs
 
+    def _get_gpu_stats(self):
+        gpu_stats = {}
+        free, total = [x / (1024 * 1024) for x in torch.cuda.mem_get_info(self.mean.device.index)]
+        self.max_gpu_usage = max(self.max_gpu_usage, total - free)
+        gpu_stats["max_gpu_memory"] = self.max_gpu_usage
+        return gpu_stats
+
     @staticmethod
     def _training_stats(batch):
         stats = {}
@@ -181,6 +190,7 @@ class Overflow(BaseTTS):
 
         # for printing useful statistics on terminal
         loss_dict.update(self._training_stats(batch))
+        loss_dict.update(self._get_gpu_stats())
         return outputs, loss_dict
 
     def eval_step(self, batch: Dict, criterion: nn.Module):
@@ -243,6 +253,22 @@ class Overflow(BaseTTS):
         outputs.update({"model_outputs": mels, "model_outputs_len": mel_outputs_len})
         outputs["alignments"] = OverflowUtils.double_pad(outputs["alignments"])
         return outputs
+
+    def get_scheduler(self, optimizer: torch.optim.Optimizer):
+        lr_scheduler = self.config.lr_scheduler
+        lr_scheduler_params = self.config.lr_scheduler_params
+
+        if lr_scheduler is not None:
+            warmup = lr_scheduler_params.get("warmup_steps", 0)
+
+            def warm_decay(step, warmup):
+                if step < warmup:
+                    return step / warmup
+                return warmup**0.5 * step**-0.5
+
+            return torch.optim.lr_scheduler.LambdaLR(optimizer, partial(warm_decay, warmup=warmup))
+
+        return None
 
     @staticmethod
     def get_criterion():
