@@ -8,6 +8,7 @@ from tqdm.auto import tqdm
 
 from hifigan.env import AttrDict
 from hifigan.models import Generator
+from hvd_sentences import hvd_sentences
 from TTS.utils.manage import ModelManager
 from TTS.utils.synthesizer import Synthesizer
 
@@ -183,23 +184,25 @@ lj_valid = [
 
 lj_valid = list(test_sentences.values())
 
+lj_valid = hvd_sentences
+
 # test_sentences ={ 1 : "THE DIFFERENCE IN THE RAINBOW DEPENDS CONSIDERABLY UPON THE SIZE OF THE DROPS." }
 
 
 MODELS = {
     # "glow": "tts_models/en/ljspeech/glow-tts",
     # "tacotron2": "tts_models/en/ljspeech/tacotron2-DCA",
-    "overflow": "tts_models/en/ljspeech/overflow",
+    # "overflow": "tts_models/en/ljspeech/overflow",
     # "FastPitch": "tts_models/en/ljspeech/fast_pitch",
-    # "vits": "tts_models/en/ljspeech/vits",
+    "vits": "tts_models/en/ljspeech/vits",
 }
 
 MODELS_PATH = {
-    "overflow": {
-        "model_path": "recipes/ljspeech/overflow/berzlius/checkpoint_{}.pth",
-        "config_path": "recipes/ljspeech/overflow/berzlius/config.json",
-        "vocoder_name": "vocoder_models/en/ljspeech/hifigan_v2",
-    },
+    # "overflow": {
+    #     "model_path": "recipes/ljspeech/overflow/berzlius/checkpoint_{}.pth",
+    #     "config_path": "recipes/ljspeech/overflow/berzlius/config.json",
+    #     "vocoder_name": "vocoder_models/en/ljspeech/hifigan_v2",
+    # },
     # "glow": {
     # "model_path": "recipes/ljspeech/glow_tts/run-January-13-2023_09+07PM-39a668ff/checkpoint_100000.pth",
     # "config_path": "recipes/ljspeech/glow_tts/run-January-13-2023_09+07PM-39a668ff/config.json",
@@ -213,25 +216,25 @@ MODELS_PATH = {
     #     "config_path": "~/.local/share/tts/tts_models--en--ljspeech--tacotron2-DCA/config.json",
     #     "vocoder_name": "vocoder_models/en/ljspeech/hifigan_v2"
     # }
-    # "FastPitch": {
-    #     "model_path": "recipes/ljspeech/fast_pitch/fast_pitch_ljspeech-January-15-2023_09+35AM-bd402331/checkpoint_{}.pth",
-    #     "config_path": "recipes/ljspeech/fast_pitch/fast_pitch_ljspeech-January-15-2023_09+35AM-bd402331/config.json",
-    #     "vocoder_name": "vocoder_models/en/ljspeech/hifigan_v2"
-    # },
-    # "vits": {
-    #     "model_path": "recipes/ljspeech/vits_tts/vits_ljspeech-January-17-2023_02+23PM-2a958722/checkpoint_{}.pth",
-    #     "config_path": "recipes/ljspeech/vits_tts/vits_ljspeech-January-17-2023_02+23PM-2a958722/config.json",
-    #     "vocoder_name": None
-    # }
+    "FastPitch": {
+        "model_path": "recipes/ljspeech/fast_pitch/fast_pitch_ljspeech-January-15-2023_09+35AM-bd402331/checkpoint_{}.pth",
+        "config_path": "recipes/ljspeech/fast_pitch/fast_pitch_ljspeech-January-15-2023_09+35AM-bd402331/config.json",
+        "vocoder_name": "vocoder_models/en/ljspeech/hifigan_v2",
+    },
+    "vits": {
+        "model_path": "vits_trained/checkpoint_{}.pth",
+        "config_path": "vits_trained/config.json",
+        "vocoder_name": None,
+    },
 }
 
 # iterations = [500, 1000, 1500, 2000, 2500, 5000, 10000, 15000, 20000, 25000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000]
 # iterations = [120000, 140000, 160000, 180000, 190000]
-iterations = [40000]
+iterations = [100000]
 
 manager = ModelManager()
 
-FOLDER = Path("synth_output_lj_valid") / "FastPitch_extra"
+FOLDER = Path("HVD_SENTENCES")
 FOLDER.mkdir(exist_ok=True, parents=True)
 generator = load_hifigan("cuda")
 

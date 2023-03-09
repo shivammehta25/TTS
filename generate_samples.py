@@ -1,5 +1,6 @@
 import torch
 
+from hvd_sentences import hvd_sentences
 from TTS.config import load_config
 from TTS.tts.models import setup_model
 from TTS.utils.io import load_checkpoint
@@ -47,6 +48,8 @@ sentences = {
     "LJ019-0371.wav": "Yet the law was seldom if ever enforced.",
     "LJ018-0159.wav": "This was all the police wanted to know.",
 }
+
+sentences = hvd_sentences
 
 
 def load_model_components(model_path, config_path):
