@@ -1,3 +1,4 @@
+from io import BytesIO
 from typing import Dict, Tuple
 
 import librosa
@@ -540,7 +541,10 @@ class AudioProcessor(object):
 
     def _griffin_lim(self, S):
         angles = np.exp(2j * np.pi * np.random.rand(*S.shape))
-        S_complex = np.abs(S).astype(np.complex)
+        try:
+            S_complex = np.abs(S).astype(np.complex)
+        except AttributeError:  # np.complex is deprecated since numpy 1.20.0
+            S_complex = np.abs(S).astype(complex)
         y = self._istft(S_complex * angles)
         if not np.isfinite(y).all():
             print(" [!] Waveform is not finite everywhere. Skipping the GL.")
@@ -690,20 +694,27 @@ class AudioProcessor(object):
             x = self.rms_volume_norm(x, self.db_level)
         return x
 
-    def save_wav(self, wav: np.ndarray, path: str, sr: int = None) -> None:
+    def save_wav(self, wav: np.ndarray, path: str, sr: int = None, pipe_out = None) -> None:
         """Save a waveform to a file using Scipy.
 
         Args:
             wav (np.ndarray): Waveform to save.
             path (str): Path to a output file.
             sr (int, optional): Sampling rate used for saving to the file. Defaults to None.
+            pipe_out (BytesIO, optional): Flag to stdout the generated TTS wav file for shell pipe.
         """
         if self.do_rms_norm:
             wav_norm = self.rms_volume_norm(wav, self.db_level) * 32767
         else:
             wav_norm = wav * (32767 / max(0.01, np.max(np.abs(wav))))
 
-        scipy.io.wavfile.write(path, sr if sr else self.sample_rate, wav_norm.astype(np.int16))
+        wav_norm = wav_norm.astype(np.int16)
+        if pipe_out:
+            wav_buffer = BytesIO()
+            scipy.io.wavfile.write(wav_buffer, sr if sr else self.sample_rate, wav_norm)
+            wav_buffer.seek(0)
+            pipe_out.buffer.write(wav_buffer.read())
+        scipy.io.wavfile.write(path, sr if sr else self.sample_rate, wav_norm)
 
     def get_duration(self, filename: str) -> float:
         """Get the duration of a wav file using Librosa.

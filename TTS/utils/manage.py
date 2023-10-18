@@ -1,10 +1,12 @@
 import json
 import os
+import tarfile
 import zipfile
 from pathlib import Path
 from shutil import copyfile, rmtree
 from typing import Dict, List, Tuple
 
+import fsspec
 import requests
 from tqdm import tqdm
 
@@ -20,6 +22,7 @@ LICENSE_URLS = {
     "apache 2.0": "https://choosealicense.com/licenses/apache-2.0/",
     "apache2": "https://choosealicense.com/licenses/apache-2.0/",
     "cc-by-sa 4.0": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "cpml": "https://coqui.ai/cpml.txt",
 }
 
 
@@ -87,7 +90,7 @@ class ModelManager(object):
 
     def _list_models(self, model_type, model_count=0):
         if self.verbose:
-            print(" Name format: type/language/dataset/model")
+            print("\n Name format: type/language/dataset/model")
         model_list = []
         for lang in self.models_dict[model_type]:
             for dataset in self.models_dict[model_type][lang]:
@@ -245,6 +248,119 @@ class ModelManager(object):
         else:
             print(" > Model's license - No license information available")
 
+    def _download_github_model(self, model_item: Dict, output_path: str):
+        if isinstance(model_item["github_rls_url"], list):
+            self._download_model_files(model_item["github_rls_url"], output_path, self.progress_bar)
+        else:
+            self._download_zip_file(model_item["github_rls_url"], output_path, self.progress_bar)
+
+    def _download_hf_model(self, model_item: Dict, output_path: str):
+        if isinstance(model_item["hf_url"], list):
+            self._download_model_files(model_item["hf_url"], output_path, self.progress_bar)
+        else:
+            self._download_zip_file(model_item["hf_url"], output_path, self.progress_bar)
+
+    def download_fairseq_model(self, model_name, output_path):
+        URI_PREFIX = "https://coqui.gateway.scarf.sh/fairseq/"
+        _, lang, _, _ = model_name.split("/")
+        model_download_uri = os.path.join(URI_PREFIX, f"{lang}.tar.gz")
+        self._download_tar_file(model_download_uri, output_path, self.progress_bar)
+
+    @staticmethod
+    def set_model_url(model_item: Dict):
+        model_item["model_url"] = None
+        if "github_rls_url" in model_item:
+            model_item["model_url"] = model_item["github_rls_url"]
+        elif "hf_url" in model_item:
+            model_item["model_url"] = model_item["hf_url"]
+        elif "fairseq" in model_item["model_name"]:
+            model_item["model_url"] = "https://coqui.gateway.scarf.sh/fairseq/"
+        return model_item
+
+    def _set_model_item(self, model_name):
+        # fetch model info from the dict
+        model_type, lang, dataset, model = model_name.split("/")
+        model_full_name = f"{model_type}--{lang}--{dataset}--{model}"
+        if "fairseq" in model_name:
+            model_item = {
+                "model_type": "tts_models",
+                "license": "CC BY-NC 4.0",
+                "default_vocoder": None,
+                "author": "fairseq",
+                "description": "this model is released by Meta under Fairseq repo. Visit https://github.com/facebookresearch/fairseq/tree/main/examples/mms for more info.",
+            }
+            model_item["model_name"] = model_name
+        else:
+            # get model from models.json
+            model_item = self.models_dict[model_type][lang][dataset][model]
+            model_item["model_type"] = model_type
+        model_item = self.set_model_url(model_item)
+        return model_item, model_full_name, model
+
+    def ask_tos(self, model_full_path):
+        """Ask the user to agree to the terms of service"""
+        tos_path = os.path.join(model_full_path, "tos_agreed.txt")
+        if not os.path.exists(tos_path):
+            print(" > You must agree to the terms of service to use this model.")
+            print(" | > Please see the terms of service at https://coqui.ai/cpml.txt")
+            print(' | > "I have read, understood and agreed the Terms and Conditions." - [y/n]')
+            answer = input(" | | > ")
+            if answer.lower() == "y":
+                with open(tos_path, "w") as f:
+                    f.write("I have read, understood ad agree the Terms and Conditions.")
+                return True
+            else:
+                return False
+
+    def tos_agreed(self, model_item, model_full_path):
+        """Check if the user has agreed to the terms of service"""
+        if "tos_required" in model_item and model_item["tos_required"]:
+            tos_path = os.path.join(model_full_path, "tos_agreed.txt")
+            if os.path.exists(tos_path) or os.environ.get("COQUI_TOS_AGREED") == "1":
+                return True
+            return False
+        return True
+
+    def create_dir_and_download_model(self, model_name, model_item, output_path):
+        os.makedirs(output_path, exist_ok=True)
+        # handle TOS
+        if not self.tos_agreed(model_item, output_path):
+            if not self.ask_tos(output_path):
+                os.rmdir(output_path)
+                raise Exception(" [!] You must agree to the terms of service to use this model.")
+        print(f" > Downloading model to {output_path}")
+        try:
+            if "fairseq" in model_name:
+                self.download_fairseq_model(model_name, output_path)
+            elif "github_rls_url" in model_item:
+                self._download_github_model(model_item, output_path)
+            elif "hf_url" in model_item:
+                self._download_hf_model(model_item, output_path)
+
+        except requests.RequestException as e:
+            print(f" > Failed to download the model file to {output_path}")
+            rmtree(output_path)
+            raise e
+        self.print_model_license(model_item=model_item)
+
+    def check_if_configs_are_equal(self, model_name, model_item, output_path):
+        with fsspec.open(self._find_files(output_path)[1], "r", encoding="utf-8") as f:
+            config_local = json.load(f)
+        remote_url = None
+        for url in model_item["hf_url"]:
+            if "config.json" in url:
+                remote_url = url
+                break
+
+        with fsspec.open(remote_url, "r", encoding="utf-8") as f:
+            config_remote = json.load(f)
+
+        if not config_local == config_remote:
+            print(f" > {model_name} is already downloaded however it has been changed. Redownloading it...")
+            self.create_dir_and_download_model(model_name, model_item, output_path)
+        else:
+            print(f" > {model_name} is already downloaded.")
+
     def download_model(self, model_name):
         """Download model files given the full model name.
         Model name is in the format
@@ -259,23 +375,29 @@ class ModelManager(object):
         Args:
             model_name (str): model name as explained above.
         """
-        # fetch model info from the dict
-        model_type, lang, dataset, model = model_name.split("/")
-        model_full_name = f"{model_type}--{lang}--{dataset}--{model}"
-        model_item = self.models_dict[model_type][lang][dataset][model]
-        model_item["model_type"] = model_type
+        model_item, model_full_name, model = self._set_model_item(model_name)
         # set the model specific output path
         output_path = os.path.join(self.output_prefix, model_full_name)
         if os.path.exists(output_path):
-            print(f" > {model_name} is already downloaded.")
+            # if the configs are different, redownload it
+            # ToDo: we need a better way to handle it
+            if "xtts_v1" in model_name:
+                try:
+                    self.check_if_configs_are_equal(model_name, model_item, output_path)
+                except:
+                    pass
+            else:
+                print(f" > {model_name} is already downloaded.")
         else:
-            os.makedirs(output_path, exist_ok=True)
-            print(f" > Downloading model to {output_path}")
-            # download from github release
-            self._download_zip_file(model_item["github_rls_url"], output_path, self.progress_bar)
-            self.print_model_license(model_item=model_item)
+            self.create_dir_and_download_model(model_name, model_item, output_path)
+
         # find downloaded files
-        output_model_path, output_config_path = self._find_files(output_path)
+        output_model_path = output_path
+        output_config_path = None
+        if (
+            model not in ["tortoise-v2", "bark", "xtts_v1"] and "fairseq" not in model_name
+        ):  # TODO:This is stupid but don't care for now.
+            output_model_path, output_config_path = self._find_files(output_path)
         # update paths in the config.json
         self._update_paths(output_path, output_config_path)
         return output_model_path, output_config_path, model_item
@@ -407,13 +529,68 @@ class ModelManager(object):
             print(f" > Error: Bad zip file - {file_url}")
             raise zipfile.BadZipFile  # pylint: disable=raise-missing-from
         # move the files to the outer path
-        for file_path in z.namelist()[1:]:
+        for file_path in z.namelist():
             src_path = os.path.join(output_folder, file_path)
+            if os.path.isfile(src_path):
+                dst_path = os.path.join(output_folder, os.path.basename(file_path))
+                if src_path != dst_path:
+                    copyfile(src_path, dst_path)
+        # remove redundant (hidden or not) folders
+        for file_path in z.namelist():
+            if os.path.isdir(os.path.join(output_folder, file_path)):
+                rmtree(os.path.join(output_folder, file_path))
+
+    @staticmethod
+    def _download_tar_file(file_url, output_folder, progress_bar):
+        """Download the github releases"""
+        # download the file
+        r = requests.get(file_url, stream=True)
+        # extract the file
+        try:
+            total_size_in_bytes = int(r.headers.get("content-length", 0))
+            block_size = 1024  # 1 Kibibyte
+            if progress_bar:
+                progress_bar = tqdm(total=total_size_in_bytes, unit="iB", unit_scale=True)
+            temp_tar_name = os.path.join(output_folder, file_url.split("/")[-1])
+            with open(temp_tar_name, "wb") as file:
+                for data in r.iter_content(block_size):
+                    if progress_bar:
+                        progress_bar.update(len(data))
+                    file.write(data)
+            with tarfile.open(temp_tar_name) as t:
+                t.extractall(output_folder)
+                tar_names = t.getnames()
+            os.remove(temp_tar_name)  # delete tar after extract
+        except tarfile.ReadError:
+            print(f" > Error: Bad tar file - {file_url}")
+            raise tarfile.ReadError  # pylint: disable=raise-missing-from
+        # move the files to the outer path
+        for file_path in os.listdir(os.path.join(output_folder, tar_names[0])):
+            src_path = os.path.join(output_folder, tar_names[0], file_path)
             dst_path = os.path.join(output_folder, os.path.basename(file_path))
             if src_path != dst_path:
                 copyfile(src_path, dst_path)
         # remove the extracted folder
-        rmtree(os.path.join(output_folder, z.namelist()[0]))
+        rmtree(os.path.join(output_folder, tar_names[0]))
+
+    @staticmethod
+    def _download_model_files(file_urls, output_folder, progress_bar):
+        """Download the github releases"""
+        for file_url in file_urls:
+            # download the file
+            r = requests.get(file_url, stream=True)
+            # extract the file
+            bease_filename = file_url.split("/")[-1]
+            temp_zip_name = os.path.join(output_folder, bease_filename)
+            total_size_in_bytes = int(r.headers.get("content-length", 0))
+            block_size = 1024  # 1 Kibibyte
+            with open(temp_zip_name, "wb") as file:
+                if progress_bar:
+                    progress_bar = tqdm(total=total_size_in_bytes, unit="iB", unit_scale=True)
+                for data in r.iter_content(block_size):
+                    if progress_bar:
+                        progress_bar.update(len(data))
+                    file.write(data)
 
     @staticmethod
     def _check_dict_key(my_dict, key):
